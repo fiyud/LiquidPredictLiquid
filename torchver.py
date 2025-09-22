@@ -12,13 +12,24 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+import random
 import warnings
 warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Cell 2: Set paths and load data
+def set_seeds(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+set_seeds(42)
+
 image_original_path = r"D:\NCKH.2025-2026\profNgan\Image_AnKhe_Goc (1)\image_original"
 image_mask_path = r"D:\NCKH.2025-2026\profNgan\Image_AnKhe_Goc (1)\images_mask_AnKhe"
 label_path = r"D:\NCKH.2025-2026\profNgan\Image_AnKhe_Goc (1)\label_AnKhe_goc"
@@ -292,8 +303,11 @@ class WaterLevelDataset(Dataset):
     def __init__(self, sequences, targets, scaler_y=None, fit_scaler=False):
         self.sequences = torch.FloatTensor(sequences)
         
-        if fit_scaler and scaler_y is None:
-            self.scaler_y = MinMaxScaler()
+        if fit_scaler:
+            if scaler_y is None:
+                self.scaler_y = MinMaxScaler()
+            else:
+                self.scaler_y = scaler_y
             targets_scaled = self.scaler_y.fit_transform(targets.reshape(-1, 1)).flatten()
         elif scaler_y is not None:
             self.scaler_y = scaler_y

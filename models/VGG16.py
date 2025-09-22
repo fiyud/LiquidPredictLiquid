@@ -12,13 +12,24 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+import random
 import warnings
 warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-# Cell 2: Set paths and load data
+def set_seeds(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+set_seeds(42)
+
 image_original_path = r"D:\NCKH.2025-2026\profNgan\Image_AnKhe_Goc (1)\image_original"
 image_mask_path = r"D:\NCKH.2025-2026\profNgan\Image_AnKhe_Goc (1)\images_mask_AnKhe"
 label_path = r"D:\NCKH.2025-2026\profNgan\Image_AnKhe_Goc (1)\label_AnKhe_goc"
@@ -29,7 +40,6 @@ print(f"Image mask path exists: {os.path.exists(image_mask_path)}")
 print(f"Label path exists: {os.path.exists(label_path)}")
 print(f"CSV path exists: {os.path.exists(csv_path)}")
 
-# Cell 3: Load and preprocess images
 def load_mask_images(mask_path, target_size=(320, 320)):
     image_files = glob.glob(os.path.join(mask_path, "*"))
     images = []
@@ -49,7 +59,6 @@ mask_images, image_filenames = load_mask_images(image_mask_path)
 print(f"Loaded {len(mask_images)} mask images")
 print(f"Image shape: {mask_images.shape}")
 
-# Cell 4: Interpolate images to monthly coverage
 def interpolate_images_to_monthly(images, target_months=48):
     if len(images) >= target_months:
         return images[:target_months]
@@ -76,7 +85,6 @@ interpolated_images = interpolate_images_to_monthly(mask_images, 48)
 interpolated_images = interpolated_images.reshape(-1, 1, 320, 320)
 print(f"Interpolated images shape: {interpolated_images.shape}")
 
-# Cell 5: Load and preprocess time series data
 df = pd.read_csv(csv_path)
 df['Time'] = pd.to_datetime(df['Time'])
 df = df.sort_values('Time').reset_index(drop=True)
@@ -94,7 +102,6 @@ df = df.dropna().reset_index(drop=True)
 print(f"Time series data shape: {df.shape}")
 print(f"Date range: {df['Time'].min()} to {df['Time'].max()}")
 
-# Cell 6: Define VGG19 feature extractor
 class VGG19FeatureExtractor(nn.Module):
     def __init__(self, input_channels=1, output_features=1024):
         super(VGG19FeatureExtractor, self).__init__()
@@ -163,7 +170,6 @@ class VGG19FeatureExtractor(nn.Module):
 vgg19_model = VGG19FeatureExtractor().to(device)
 print("VGG19 model built")
 
-# Cell 7: Extract image features
 def extract_image_features(model, images, batch_size=4):
     model.eval()
     features = []
@@ -180,7 +186,6 @@ def extract_image_features(model, images, batch_size=4):
 image_features = extract_image_features(vgg19_model, interpolated_images)
 print(f"Image features shape: {image_features.shape}")
 
-# Cell 8: Define time series feature extractor
 class TimeSeriesFeatureExtractor(nn.Module):
     def __init__(self, input_dim, output_features=1024):
         super(TimeSeriesFeatureExtractor, self).__init__()
@@ -225,7 +230,6 @@ def extract_ts_features(model, data, batch_size=32):
 ts_features = extract_ts_features(ts_model, ts_feature_data_scaled)
 print(f"Time series features shape: {ts_features.shape}")
 
-# Cell 9: Expand image features to daily resolution
 def expand_image_features_to_daily(image_features, n_days):
     n_months = len(image_features)
     days_per_month = n_days / n_months
@@ -243,7 +247,6 @@ def expand_image_features_to_daily(image_features, n_days):
 expanded_image_features = expand_image_features_to_daily(image_features, len(ts_features))
 print(f"Expanded image features shape: {expanded_image_features.shape}")
 
-# Cell 10: Combine multimodal features
 feature_scaler = StandardScaler()
 image_features_norm = feature_scaler.fit_transform(expanded_image_features)
 ts_features_norm = feature_scaler.fit_transform(ts_features)
@@ -251,7 +254,6 @@ ts_features_norm = feature_scaler.fit_transform(ts_features)
 combined_features = np.concatenate([image_features_norm, ts_features_norm], axis=1)
 print(f"Combined features shape: {combined_features.shape}")
 
-# Cell 11: Create sequences for GRU
 def create_sequences_for_gru(features, labels, time_steps=4):
     X, y = [], []
     
@@ -269,7 +271,6 @@ labels = labels[:min_len]
 X_seq, y_seq = create_sequences_for_gru(combined_features, labels, time_steps=4)
 print(f"Sequence shapes - X: {X_seq.shape}, y: {y_seq.shape}")
 
-# Cell 12: Split data
 train_size = int(0.7 * len(X_seq))
 val_size = int(0.2 * len(X_seq))
 
@@ -287,13 +288,15 @@ baseline_X_train = baseline_ts_sequences[:train_size]
 baseline_X_val = baseline_ts_sequences[train_size:train_size+val_size]
 baseline_X_test = baseline_ts_sequences[train_size+val_size:]
 
-# Cell 13: Define Dataset class
 class WaterLevelDataset(Dataset):
     def __init__(self, sequences, targets, scaler_y=None, fit_scaler=False):
         self.sequences = torch.FloatTensor(sequences)
         
-        if fit_scaler and scaler_y is None:
-            self.scaler_y = MinMaxScaler()
+        if fit_scaler:
+            if scaler_y is None:
+                self.scaler_y = MinMaxScaler()
+            else:
+                self.scaler_y = scaler_y
             targets_scaled = self.scaler_y.fit_transform(targets.reshape(-1, 1)).flatten()
         elif scaler_y is not None:
             self.scaler_y = scaler_y
@@ -327,7 +330,6 @@ baseline_train_loader = DataLoader(baseline_train_dataset, batch_size=32, shuffl
 baseline_val_loader = DataLoader(baseline_val_dataset, batch_size=32, shuffle=False)
 baseline_test_loader = DataLoader(baseline_test_dataset, batch_size=32, shuffle=False)
 
-# Cell 14: Define GRU models
 class ProposedGRUModel(nn.Module):
     def __init__(self, feature_dim, hidden_dim=128, num_layers=2):
         super(ProposedGRUModel, self).__init__()
@@ -375,7 +377,6 @@ print("Models built")
 print(f"Proposed model input shape: {X_seq.shape}")
 print(f"Baseline model input shape: {baseline_ts_sequences.shape}")
 
-# Cell 15: Training function
 def train_model(model, train_loader, val_loader, num_epochs=50, lr=0.001):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -424,7 +425,6 @@ proposed_train_losses, proposed_val_losses = train_model(proposed_model, train_l
 print("Training baseline model...")
 baseline_train_losses, baseline_val_losses = train_model(baseline_model, baseline_train_loader, baseline_val_loader)
 
-# Cell 16: Make predictions
 def make_predictions(model, test_loader, scaler_y):
     model.eval()
     predictions = []
@@ -452,7 +452,6 @@ print("Predictions completed")
 print(f"Predicted shapes - Proposed: {y_pred_proposed.shape}, Baseline: {y_pred_baseline.shape}")
 print(f"Actual test shape: {y_test_actual.shape}")
 
-# Cell 17: Calculate evaluation metrics
 def calculate_metrics(y_true, y_pred):
     mae = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
@@ -481,7 +480,6 @@ print(f"MAE improvement:  {mae_improvement:.1f}%")
 print(f"MSE improvement:  {mse_improvement:.1f}%")
 print(f"RMSE improvement: {rmse_improvement:.1f}%")
 
-# Cell 18: Visualize results
 plt.figure(figsize=(15, 10))
 
 plt.subplot(2, 2, 1)
@@ -535,7 +533,6 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
 
-# Cell 19: Training history visualization
 plt.figure(figsize=(12, 8))
 
 plt.subplot(2, 2, 1)
@@ -575,7 +572,6 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
 
-# Cell 20: Additional analysis and save results
 flood_data = df[df['IsFloodSeason'] == 1]['WaterLevel_m']
 dry_data = df[df['IsFloodSeason'] == 0]['WaterLevel_m']
 

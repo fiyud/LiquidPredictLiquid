@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 
 class GeM(nn.Module):
-    """Generalized Mean Pooling: mặc định m=3.0; m=1 -> GAP, m->inf -> GMP"""
     def __init__(self, p: float = 3.0, eps: float = 1e-6):
         super().__init__()
         self.p = nn.Parameter(torch.tensor(p))
@@ -13,17 +12,9 @@ class GeM(nn.Module):
         return torch.mean(x, dim=(-2, -1)).pow(1.0 / self.p)  # (B,C)
 
 class VGGMSFeatureExtractor(nn.Module):
-    """
-    VGG-based Multi-Scale Feature Extractor
-    Rút đặc trưng từ các tầng VGG: conv3_x, conv4_x, conv5_x (multi-scale) -> concat -> head -> 1024-d.
-    - Đóng băng backbone để ổn định khi chỉ train GRU.
-    - Dùng GeM (ổn định hơn GAP) + LayerNorm + MLP nhỏ.
-    """
     def __init__(self, input_channels=1, output_features=1024, freeze_backbone=True):
         super().__init__()
-        
-        # VGG19-like backbone
-        # Block 1: 64 channels
+
         self.block1 = nn.Sequential(
             nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
@@ -104,11 +95,10 @@ class VGGMSFeatureExtractor(nn.Module):
             for p in self.norm.parameters():
                 p.requires_grad = True
         
-        self.eval()  # mặc định đặt eval để BN/Dropout cố định khi trích xuất
+        self.eval()
 
     @torch.no_grad()
     def forward(self, x):
-        # Forward through VGG blocks
         x = self.block1(x)  # 64 channels
         x = self.block2(x)  # 128 channels
         x3 = self.block3(x)  # 256 channels, 40x40

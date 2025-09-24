@@ -169,6 +169,12 @@ class SelectiveSSM(nn.Module):
         
         output = torch.stack(outputs, dim=1)  # (B, L, D)
         return output
+    
+    def reset_liquid_state(self):
+        """Reset liquid state parameters for stable training."""
+        # Reset the liquid scaling parameters
+        if hasattr(self, 'tau'):
+            self.tau.data.fill_(1.0)  # Reset to default time constant
 
 
 class LiquidMambaAttention(nn.Module):
@@ -258,10 +264,9 @@ class LiquidMambaAttention(nn.Module):
         return output, None
     
     def reset_liquid_state(self):
-        """Reset LTC hidden state"""
-        if hasattr(self.ssm, 'liquid_scaler'):
-            self.ssm.liquid_scaler.reset_state()
-
+        """Reset the liquid state in the SSM component."""
+        if hasattr(self.ssm, 'reset_liquid_state'):
+            self.ssm.reset_liquid_state()
 
 class MultiScaleLiquidMamba(nn.Module):
     """
@@ -327,7 +332,13 @@ class MultiScaleLiquidMamba(nn.Module):
         output = self.output_proj(mixed_output)
         
         return output, None
-
+    
+    def reset_liquid_state(self):
+        """Reset liquid states for all branches"""
+        for branch in self.mamba_branches:
+            if hasattr(branch, 'reset_liquid_state'):
+                branch.reset_liquid_state()
+    
 
 # Example usage và comparison
 if __name__ == "__main__":

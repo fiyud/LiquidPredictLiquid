@@ -1,15 +1,13 @@
-"""Parts of the U-Net model (PosEnc C3STR + Hybrid Activations)"""
-
 from typing import Optional, Literal
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 class DynamicSnake(nn.Module):
-    """
-    y = x + sin^2(a * x) / (a + eps), với a học theo kênh.
-    """
     def __init__(self, channels: int, init_alpha: float = 0.5, clamp_min: float = 0.1, clamp_max: float = 10.0):
         super().__init__()
         self.alpha = nn.Parameter(torch.full((1, channels, 1, 1), float(init_alpha)))
@@ -19,8 +17,7 @@ class DynamicSnake(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         a = self.alpha.clamp(self.clamp_min, self.clamp_max)
         return x + torch.sin(a * x) ** 2 / (a + 1e-6)
-
-
+    
 def _make_act(channels: int, act_type: Literal['relu', 'silu', 'snake'] = 'relu') -> nn.Module:
     if act_type == 'relu':
         return nn.ReLU(inplace=True)
@@ -31,7 +28,6 @@ def _make_act(channels: int, act_type: Literal['relu', 'silu', 'snake'] = 'relu'
     raise ValueError(f'Unsupported act_type: {act_type}')
 
 class DoubleConv(nn.Module):
-    """(conv => BN => Act) * 2 (Act = ReLU/SiLU/DynamicSnake)"""
     def __init__(self, in_channels: int, out_channels: int,
                  mid_channels: Optional[int] = None,
                  act_type: Literal['relu', 'silu', 'snake'] = 'relu'):
@@ -53,7 +49,6 @@ class DoubleConv(nn.Module):
 
 
 class Down(nn.Module):
-    """Downscaling bằng MaxPool rồi DoubleConv (tùy chọn activation)"""
     def __init__(self, in_channels: int, out_channels: int,
                  act_type: Literal['relu', 'silu', 'snake'] = 'relu'):
         super().__init__()
@@ -67,7 +62,6 @@ class Down(nn.Module):
 
 
 class Up(nn.Module):
-    """Upscaling rồi DoubleConv; hỗ trợ bilinear hoặc transposed conv (tùy chọn activation)"""
     def __init__(self, in_channels: int, out_channels: int,
                  bilinear: bool = True,
                  act_type: Literal['relu', 'silu', 'snake'] = 'relu'):
@@ -84,10 +78,8 @@ class Up(nn.Module):
             self.conv = DoubleConv(in_channels, out_channels, act_type=act_type)
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
-        # x1: feature từ tầng dưới; x2: skip-connection
         x1 = self.up(x1)
 
-        # Căn lề cho khớp kích thước
         diffY = x2.size(2) - x1.size(2)
         diffX = x2.size(3) - x1.size(3)
         x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
@@ -105,11 +97,11 @@ class OutConv(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(x)
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 class PositionalEncoding2D(nn.Module):
-    """
-    Sinusoidal 2D PE, ánh xạ vào cùng số kênh với tensor đầu vào.
-    """
     def __init__(self, channels: int):
         super().__init__()
         assert channels % 4 == 0, "PositionalEncoding2D: channels phải chia hết cho 4"
@@ -140,7 +132,10 @@ class PositionalEncoding2D(nn.Module):
         pe = torch.cat([pe_y, pe_x], dim=-1).permute(2, 0, 1).unsqueeze(0)  # (1,C,H,W)
         return x + pe
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 class C3STR(nn.Module):
     """
     1x1 conv -> BN/ReLU -> +PE -> TransformerEncoder (chuỗi HW) -> 1x1 conv + residual.
@@ -166,7 +161,7 @@ class C3STR(nn.Module):
             batch_first=True,
             activation="gelu",
             norm_first=True,
-            dropout=dropout,          # thêm dropout
+            dropout=dropout,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
 
@@ -196,9 +191,7 @@ class C3STR(nn.Module):
         x = x + self.shortcut(x_in)
         return self.act(x)
 
-
 class DownC3STR(nn.Module):
-    """Downscaling với MaxPool rồi C3STR."""
     def __init__(self, in_channels: int, out_channels: int,
                  n_layers: int = 2, n_heads: int = 8, mlp_ratio: int = 4, dropout: float = 0.1):
         super().__init__()

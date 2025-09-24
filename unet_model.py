@@ -18,7 +18,7 @@ class UNet(nn.Module):
                  c3str_dropout: float = 0.1,
                  # Hybrid activation
                  act_type_enc: str = 'relu',   # encoder: 'relu' khởi động ổn định
-                 act_type_dec: str = 'snake'   # decoder: 'snake' để giàu đặc trưng
+                 act_type_dec: str = 'relu'   # decoder: 'snake' để giàu đặc trưng
                  ):
         super().__init__()
         self.n_channels = n_channels

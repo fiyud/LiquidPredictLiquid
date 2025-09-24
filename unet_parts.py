@@ -6,9 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# =========================
-# DynamicSnake activation (ổn định hơn: init nhỏ + clamp)
-# =========================
 class DynamicSnake(nn.Module):
     """
     y = x + sin^2(a * x) / (a + eps), với a học theo kênh.
@@ -33,10 +30,6 @@ def _make_act(channels: int, act_type: Literal['relu', 'silu', 'snake'] = 'relu'
         return DynamicSnake(channels)
     raise ValueError(f'Unsupported act_type: {act_type}')
 
-
-# =========================
-# Khối conv cơ bản (tùy chọn activation)
-# =========================
 class DoubleConv(nn.Module):
     """(conv => BN => Act) * 2 (Act = ReLU/SiLU/DynamicSnake)"""
     def __init__(self, in_channels: int, out_channels: int,
@@ -113,9 +106,6 @@ class OutConv(nn.Module):
         return self.conv(x)
 
 
-# =========================
-# Positional Encoding 2D cho Transformer
-# =========================
 class PositionalEncoding2D(nn.Module):
     """
     Sinusoidal 2D PE, ánh xạ vào cùng số kênh với tensor đầu vào.
@@ -151,9 +141,6 @@ class PositionalEncoding2D(nn.Module):
         return x + pe
 
 
-# =========================
-# C3STR (giữ nguyên cấu trúc, thêm PE + dropout)
-# =========================
 class C3STR(nn.Module):
     """
     1x1 conv -> BN/ReLU -> +PE -> TransformerEncoder (chuỗi HW) -> 1x1 conv + residual.

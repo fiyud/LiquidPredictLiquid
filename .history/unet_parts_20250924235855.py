@@ -3,10 +3,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
-# =========================
-# DynamicSnake activation (ổn định hơn: init nhỏ + clamp)
-# =========================
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 class DynamicSnake(nn.Module):
     def __init__(self, channels: int, init_alpha: float = 0.5, clamp_min: float = 0.1, clamp_max: float = 10.0):
         super().__init__()
@@ -97,10 +100,6 @@ class OutConv(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(x)
 
-
-# =========================
-# Positional Encoding 2D cho Transformer
-# =========================
 class PositionalEncoding2D(nn.Module):
     def __init__(self, channels: int):
         super().__init__()
@@ -132,10 +131,13 @@ class PositionalEncoding2D(nn.Module):
         pe = torch.cat([pe_y, pe_x], dim=-1).permute(2, 0, 1).unsqueeze(0)  # (1,C,H,W)
         return x + pe
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
-# =========================
-# C3STR (giữ nguyên cấu trúc, thêm PE + dropout)
-# =========================
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 class C3STR(nn.Module):
     """
     1x1 conv -> BN/ReLU -> +PE -> TransformerEncoder (chuỗi HW) -> 1x1 conv + residual.
